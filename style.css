@@ -19,6 +19,7 @@ body[data-theme="light"] { --bg: var(--light-bg); --text: var(--text-light); --g
 
 * { box-sizing: border-box; }
 body { font-family: 'Poppins', sans-serif; margin: 0; background-color: var(--bg); color: var(--text); overflow-x: hidden; transition: background-color 0.3s, color 0.3s; }
+body.menu-open { overflow: hidden; }
 .hidden { display: none !important; }
 
 /* --- Backgrounds --- */
@@ -57,28 +58,31 @@ body { font-family: 'Poppins', sans-serif; margin: 0; background-color: var(--bg
 .mobile-nav-toggle { display: none; }
 
 /* --- Floating Action Button (FAB) for Mobile --- */
-.fab { display: none; /* Hidden on desktop */ }
+.fab { display: none; position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background-color: var(--primary-color); color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.4); z-index: 99; transition: transform 0.2s, background-color 0.3s, color 0.3s; }
+.fab:hover { transform: scale(1.1); }
+.fab svg { width: 28px; height: 28px; }
 
 /* --- Mobile Menu --- */
-.mobile-menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-100%); transition: transform 0.4s ease-in-out; }
+.mobile-menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--glass-bg); backdrop-filter: blur(20px); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-100%); transition: transform 0.4s ease-in-out; }
 .mobile-menu.active { transform: translateY(0); }
+.mobile-menu-close { position: absolute; top: 20px; right: 20px; background: transparent; border: none; cursor: pointer; }
+.mobile-menu-close svg { width: 32px; height: 32px; stroke: var(--text); }
 .mobile-menu .sidebar-nav, .mobile-menu .sidebar-footer { margin-top: 0; width: 80%; text-align: center; }
-.mobile-menu button { margin-bottom: 15px; }
+.mobile-menu .sidebar-nav button, .mobile-menu .sidebar-footer button { margin-bottom: 15px; justify-content: center; font-size: 18px; padding: 15px; }
 
 /* --- Responsive Design --- */
 @media (max-width: 800px) {
     .dashboard-layout { grid-template-columns: 1fr; height: auto; min-height: 100vh; padding: 0; gap: 0; }
     .sidebar { grid-row: 1 / 2; flex-direction: row; justify-content: space-between; align-items: center; height: 70px; border-radius: 0; position: sticky; top: 0; z-index: 50; padding: 0 15px; }
-    .main-content { grid-row: 2 / 3; padding: 15px; }
+    .main-content { grid-row: 2 / 3; padding: 20px; }
     .profile-box { margin-bottom: 0; display: flex; align-items: center; gap: 10px; }
     .profile-box .avatar { width: 45px; height: 45px; font-size: 1.5em; margin: 0; }
     .profile-box h2, .profile-box p { display: none; }
     .sidebar-nav, .sidebar-footer { display: none; }
     .mobile-nav-toggle { display: block; background: transparent; border: none; cursor: pointer; }
     .mobile-nav-toggle svg { width: 30px; height: 30px; stroke: var(--text); }
-    .content-header .hide-on-mobile { display: none; } /* Hide desktop button on mobile */
-    .fab { display: flex; position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background-color: var(--primary-color); color: #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.4); z-index: 99; transition: transform 0.2s; }
-    .fab:hover { transform: scale(1.1); }
+    .content-header .hide-on-mobile { display: none; }
+    .fab { display: flex; }
     #webhookList { grid-template-columns: 1fr; }
 }
 
