@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-theme="dark">
+    <div class="background-grid"></div>
+    <div class="aurora-background">
+        <div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenu" class="mobile-menu"></div>
+
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="profile-box">
+                <div class="avatar" id="avatarLetter"></div>
+                <div><h2 id="welcomeUsername"></h2><p id="userRole"></p></div>
+            </div>
+            <nav class="sidebar-nav"></nav>
+            <div class="sidebar-footer"></div>
+            <button id="mobileNavToggle" class="mobile-nav-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+        </aside>
+
+        <main class="main-content">
+            <div id="webhookListView" class="view-container">
+                <div class="content-header">
+                    <h1 class="title-glow">My Webhooks</h1>
+                    <button id="showAddWebhookModalBtnDesktop" class="cool-button hide-on-mobile"><span>+ Add New</span></button>
+                </div>
+                <div id="webhookList"></div>
+            </div>
+            <div id="announcementFormView" class="view-container hidden"></div>
+            <div id="accountsView" class="view-container hidden"></div>
+        </main>
+    </div>
+
+    <!-- Floating Action Button for Mobile -->
+    <button id="showAddWebhookModalBtnMobile" class="cool-button fab">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
+    
+    <div id="webhookModal" class="modal-overlay"></div>
+    <div id="statusMessage" class="hidden"></div>
+    <input type="file" id="importFileInput" class="hidden" accept=".json">
+
+    <script>
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (!currentUser) window.location.href = 'index.html';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let webhooks = []; let allUsers = []; let activeWebhookId = null; let isEditingLastMessage = false;
+            const webhookStorageKey = `webhooks_${currentUser.username}`;
+            const loadData = () => { webhooks = JSON.parse(localStorage.getItem(webhookStorageKey)) || []; allUsers = JSON.parse(localStorage.getItem('user_accounts')) || []; };
+            const saveData = () => { localStorage.setItem(webhookStorageKey, JSON.stringify(webhooks)); localStorage.setItem('user_accounts', JSON.stringify(allUsers)); };
+            const showStatus = (message, type = 'success') => { const el = document.getElementById('statusMessage'); el.textContent = message; el.className = `status-message status-${type}`; setTimeout(() => el.classList.add('hidden'), 4000); };
+
+            const setupUI = () => {
+                document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
+                document.getElementById('avatarLetter').textContent = currentUser.username.charAt(0).toUpperCase();
+                document.getElementById('welcomeUsername').textContent = currentUser.username;
+                document.getElementById('userRole').textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+                const hasAdminRights = currentUser.role === 'admin' || currentUser.role === 'staff';
+                const navHtml = `<button id="navWebhooks" class="active">Webhooks</button>${hasAdminRights ? '<button id="navAccounts">Accounts</button>' : ''}`;
+                const footerHtml = `<button class="cool-button" id="importBtn" style="width:100%;">Import</button><button class="cool-button" id="exportBtn" style="width:100%;">Export</button><button class="cool-button" id="themeToggle" style="width:100%;">Toggle Theme</button><button class="cool-button" id="logoutBtn" style="width:100%;">Logout</button>`;
+                document.querySelector('.sidebar-nav').innerHTML = navHtml;
+                document.querySelector('.sidebar-footer').innerHTML = footerHtml;
+                document.querySelector('#mobileMenu').innerHTML = `<nav class="sidebar-nav">${navHtml}</nav><div class="sidebar-footer">${footerHtml}</div>`;
+            };
+            
+            const showView = (viewId) => {
+                document.querySelectorAll('.view-container').forEach(v => v.classList.add('hidden')); document.getElementById(viewId).classList.remove('hidden');
+                document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+                if (viewId === 'webhookListView') document.querySelectorAll('#navWebhooks').forEach(b => b.classList.add('active'));
+                if (viewId === 'accountsView') document.querySelectorAll('#navAccounts').forEach(b => b.classList.add('active'));
+            };
+            
+            const renderWebhookList = () => { const listEl = document.getElementById('webhookList'); listEl.innerHTML = ''; const noWebhooks = webhooks.length === 0; listEl.innerHTML = noWebhooks ? '<div id="noWebhooksMessage" class="glass-card" style="padding: 40px; text-align:center; grid-column: 1 / -1;"><h2>No webhooks found.</h2><p>Click the add button to get started!</p></div>' : webhooks.map((wh, i) => `<div class="webhook-card" style="animation-delay: ${i*50}ms"><h3>${wh.name}</h3><p>${wh.url}</p><div class="card-actions"><button class="cool-button announce-btn" data-id="${wh.id}">Announce</button>${wh.lastMessageId ? `<button class="cool-button edit-last-btn" data-id="${wh.id}">Edit Last</button>`:''}<button class="cool-button danger delete-btn" data-id="${wh.id}">Delete</button></div></div>`).join(''); };
+            const renderAccountsView = () => { const view = document.getElementById('accountsView'); view.innerHTML = `<div class="content-header"><h1 class="title-glow">Manage Accounts</h1></div><div class="glass-card" style="text-align:left;"><ul id="userList"></ul><form id="createAccountForm" style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;"><h3>Create New Account</h3><div class="input-group"><input type="text" id="newUsername" required><label>Username</label></div><div class="input-group"><input type="password" id="newPassword" required><label>Password</label></div><div class="input-group"><select id="newRole" required><option value="user">User</option><option value="staff">Staff</option></select><label>Role</label></div><button type="submit" class="cool-button"><span>Create Account</span></button></form></div>`; renderUserList(); view.querySelector('#createAccountForm').addEventListener('submit', createAccount); };
+            const renderUserList = () => { document.getElementById('userList').innerHTML = allUsers.map(user => `<li style="display:flex; justify-content:space-between; align-items:center; padding: 10px; border-bottom: 1px solid var(--border);"><span>${user.username} <span style="opacity:0.7">(${user.role})</span></span> ${user.role !== 'admin' ? `<button class="cool-button danger delete-user-btn" data-username="${user.username}" style="padding:5px 10px; font-size:12px;">Delete</button>` : ''}</li>`).join(''); };
+            const createAccount = e => { e.preventDefault(); const u=document.getElementById("newUsername").value,p=document.getElementById("newPassword").value,r=document.getElementById("newRole").value; if(allUsers.some(e=>e.username===u))return showStatus("Username exists!","error"); allUsers.push({username:u,password:p,role:r}); saveData(); renderUserList(); e.target.reset(); showStatus("Account created!","success"); };
+            const deleteAccount = e => { const u=e.target.dataset.username; if(confirm(`Delete ${u}?`)){allUsers=allUsers.filter(e=>e.username!==u); saveData(); renderUserList();} };
+            const prepareAnnouncementForm = (webhookId, isEditing = false) => { activeWebhookId = webhookId; isEditingLastMessage = isEditing; const webhook = webhooks.find(wh => wh.id === webhookId); if(isEditing && !webhook.lastMessageId) return showStatus('No message to edit!', 'error'); document.getElementById('announcementFormView').innerHTML = `<div class="content-header"><h1 id="formTitle" class="title-glow">${isEditing ? `Edit: ${webhook.name}`:`Announce: ${webhook.name}`}</h1></div><form id="announcementForm"><!-- form fields --></form>`; document.getElementById('announcementForm').innerHTML = `<div class="form-section"><div class="input-group"><textarea id="messageContent"></textarea><label>Message Content</label></div></div><div class="form-section"><h3>Embed</h3><div style="display:flex;align-items:center;gap:15px;margin-bottom:20px"><label for="embedColor">Color</label><input type="color" id="embedColor" value="#E50914"></div><div class="input-group"><input type="text" id="embedTitle"><label>Title</label></div><div class="input-group"><textarea id="embedDescription"></textarea><label>Description</label></div><div class="input-group"><input type="text" id="embedAuthor"><label>Author</label></div><div class="input-group"><input type="url" id="embedAuthorIcon"><label>Author Icon URL</label></div><div class="input-group"><input type="url" id="embedImage"><label>Image URL</label></div><div class="input-group"><input type="url" id="embedThumbnail"><label>Thumbnail URL</label></div><div class="input-group"><input type="text" id="embedFooter"><label>Footer</label></div><div class="input-group"><input type="url" id="embedFooterIcon"><label>Footer Icon URL</label></div></div><div class="form-section"><h3>Fields</h3><div id="fieldsContainer"></div><button type="button" id="addFieldBtn" class="cool-button">Add Field</button></div><div style="text-align:center;"><button type="submit" class="cool-button">Send Announcement</button></div>`; document.getElementById('addFieldBtn').addEventListener('click', () => {const id = Date.now(); document.getElementById('fieldsContainer').insertAdjacentHTML('beforeend', `<div style="border:1px solid var(--border); padding:15px; border-radius:8px; position:relative; margin-top:15px;"><button type="button" onclick="this.parentElement.remove()" style="position:absolute; top:-10px; right:-10px; background:var(--primary-color);color:white;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-weight:bold;">X</button><div class="input-group"><input type="text" class="field-name"><label>Field Name</label></div><div class="input-group"><input type="text" class="field-value"><label>Field Value</label></div><div style="display:flex; align-items:center;"><input type="checkbox" id="inline-${id}" class="field-inline"><label for="inline-${id}" style="position:static; opacity:1; background:transparent; padding:0 5px;">Inline?</label></div></div>`)}); showView('announcementFormView'); };
+            const handleSendAnnouncement = async e => { e.preventDefault(); const webhook=webhooks.find(wh=>wh.id===activeWebhookId), c=parseInt(document.getElementById("embedColor").value.substring(1),16), p={content:document.getElementById("messageContent").value||null,embeds:[]}, em={title:document.getElementById("embedTitle").value,description:document.getElementById("embedDescription").value,color:c,author:{name:document.getElementById("embedAuthor").value,icon_url:document.getElementById("embedAuthorIcon").value},image:{url:document.getElementById("embedImage").value},thumbnail:{url:document.getElementById("embedThumbnail").value},footer:{text:document.getElementById("embedFooter").value,icon_url:document.getElementById("embedFooterIcon").value},fields:Array.from(document.querySelectorAll('.field-name')).map((n,i)=>({name:n.value,value:document.querySelectorAll('.field-value')[i].value,inline:document.querySelectorAll('.field-inline')[i].checked})).filter(f=>f.name&&f.value)}; if(Object.values(em).some(v=>v&&(typeof v!=='object'||Object.values(v).some(s=>s))))p.embeds.push(em); if(!p.content&&!p.embeds.length)return showStatus('Cannot send an empty message!','error'); let url=webhook.url+(isEditingLastMessage?`/messages/${webhook.lastMessageId}`:'?wait=true'); try{const res=await fetch(url,{method:isEditingLastMessage?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)}); if(!res.ok)throw new Error(JSON.stringify(await res.json())); if(!isEditingLastMessage){const data=await res.json();webhook.lastMessageId=data.id;saveData()} showStatus('Message sent successfully!','success');showView('webhookListView');renderWebhookList()}catch(err){showStatus(`Error: ${err.message}`,'error')} };
+
+            const mobileMenu = document.getElementById('mobileMenu');
+            document.getElementById('mobileNavToggle').addEventListener('click', () => mobileMenu.classList.toggle('active'));
+            mobileMenu.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') mobileMenu.classList.remove('active'); });
+
+            document.body.addEventListener('click', e => {
+                const btn = e.target.closest('button'); if (!btn) return;
+                if (btn.id === 'navWebhooks') { showView('webhookListView'); renderWebhookList(); }
+                if (btn.id === 'navAccounts') { showView('accountsView'); renderAccountsView(); }
+                if (btn.id === 'themeToggle') { const newTheme = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'; document.body.setAttribute('data-theme', newTheme); localStorage.setItem('theme', newTheme); }
+                if (btn.id === 'logoutBtn') { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; }
+                if (btn.id === 'showAddWebhookModalBtnDesktop' || btn.id === 'showAddWebhookModalBtnMobile') { const modal = document.getElementById('webhookModal'); modal.innerHTML = `<div class="glass-card modal-content"><h2>Add New Webhook</h2><form id="webhookForm"><div class="input-group"><input type="url" id="webhookUrlInput" required><label>Webhook URL</label></div><div class="input-group"><input type="text" id="webhookNameInput" required><label>Display Name</label></div><div style="display:flex; justify-content:center; gap:10px; margin-top:20px;"><button type="submit" class="cool-button"><span>Save</span></button><button type="button" class="cool-button danger" id="closeWebhookModalBtn"><span>Cancel</span></button></div></form></div>`; modal.classList.add('active'); modal.querySelector('#closeWebhookModalBtn').addEventListener('click', () => modal.classList.remove('active')); modal.querySelector('#webhookForm').addEventListener('submit', (e) => {e.preventDefault(); webhooks.push({ id: Date.now(), name: document.getElementById('webhookNameInput').value, url: document.getElementById('webhookUrlInput').value, lastMessageId: null }); saveData(); renderWebhookList(); e.target.reset(); modal.classList.remove('active');}); }
+                if (btn.classList.contains('announce-btn')) prepareAnnouncementForm(Number(btn.dataset.id), false);
+                if (btn.classList.contains('edit-last-btn')) prepareAnnouncementForm(Number(btn.dataset.id), true);
+                if (btn.classList.contains('delete-btn')) { if(confirm('Are you sure?')){ webhooks = webhooks.filter(wh => wh.id !== Number(btn.dataset.id)); saveData(); renderWebhookList();} }
+                if (btn.classList.contains('delete-user-btn')) deleteAccount(e);
+                if (btn.id === 'exportBtn') { if(!webhooks.length) return showStatus('Nothing to export!', 'error'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(webhooks,null,2)],{type:'application/json'})); a.download='webhooks.json'; a.click(); URL.revokeObjectURL(a.href); }
+                if (btn.id === 'importBtn') document.getElementById('importFileInput').click();
+            });
+            document.getElementById('announcementFormView').addEventListener('submit', handleSendAnnouncement);
+            document.getElementById('importFileInput').addEventListener('change', (e) => { const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=(e)=>{try{const data=JSON.parse(e.target.result); if(!Array.isArray(data)) throw new Error(); if(confirm("This will overwrite current webhooks. Continue?")){webhooks=data; saveData(); renderWebhookList(); showStatus('Imported!', 'success');}}catch(err){showStatus('Invalid file!', 'error');}}; reader.readText(file); e.target.value=null; });
+            
+            loadData(); setupUI(); renderWebhookList(); showView('webhookListView');
+        });
+    </script>
+</body>
+</html>
