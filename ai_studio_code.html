@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Announcer Dashboard</title>
+    <style>
+        /* --- Core Styles & Cool Background --- */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+        :root {
+            --primary-color: #ff0000;
+            --secondary-color: #007bff;
+            --danger-color: #dc3545;
+            --background-color: #121212;
+            --surface-color: #1e1e1e;
+            --text-color: #ffffff;
+            --border-color: #444;
+            --error-color: #ff3b30;
+            --success-color: #34c759;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(-45deg, #000000, #1a0000, #330000, #000000);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px 0;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* --- View Containers & Transitions --- */
+        .main-container {
+            width: 100%;
+            max-width: 850px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .view {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px var(--primary-color);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+            will-change: opacity, transform;
+        }
+
+        .view.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            position: absolute;
+            width: 100%;
+            left: 0;
+            top: 0;
+        }
+
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px var(--primary-color);
+        }
+
+        /* --- Form Elements --- */
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #ccc; }
+        input[type="text"], input[type="password"], input[type="url"], textarea, input[type="color"] {
+            width: 100%; padding: 12px; background-color: var(--background-color); border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-color); font-size: 1rem; transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input[type="color"] { padding: 5px; height: 48px; cursor: pointer; }
+        input[type="text"]:focus, input[type="password"]:focus, input[type="url"]:focus, textarea:focus, input[type="color"]:focus {
+            outline: none; border-color: var(--primary-color); box-shadow: 0 0 10px var(--primary-color);
+        }
+        textarea { resize: vertical; min-height: 100px; }
+
+        /* --- Buttons --- */
+        .btn {
+            display: inline-block; width: 100%; padding: 14px; border: none; border-radius: 6px; color: var(--text-color); font-size: 1.1rem;
+            font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .btn-primary { background: var(--primary-color); }
+        .btn-primary:hover { background: #cc0000; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(255, 0, 0, 0.4); }
+        .btn-secondary { background: #555; }
+        .btn-secondary:hover { background: #444; }
+        .btn-edit { background: var(--secondary-color); font-size: 0.9rem; padding: 8px 12px; width: auto; margin: 0 5px; }
+        .btn-edit:hover { background: #0056b3; }
+        .btn-delete { background: var(--danger-color); font-size: 0.9rem; padding: 8px 12px; width: auto; margin: 0 5px; }
+        .btn-delete:hover { background: #b02a37; }
+        
+        .btn .spinner { display: none; border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #fff;
+            width: 20px; height: 20px; animation: spin 1s ease-in-out infinite; margin: 0 auto;
+        }
+        .btn.loading .btn-text { visibility: hidden; }
+        .btn.loading .spinner { display: block; position: absolute; top: 50%; left: 50%; margin-top: -10px; margin-left: -10px;}
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Specific Sections --- */
+        .embed-section { border: 1px dashed var(--border-color); padding: 20px; margin-top: 2rem; border-radius: 8px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .field-group { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .field-group input { flex-grow: 1; }
+        .remove-field-btn { background: transparent; border: none; color: var(--primary-color); font-size: 1.5rem; cursor: pointer; padding: 5px; transition: all 0.2s; }
+        .remove-field-btn:hover { transform: scale(1.2); color: #fff; }
+        #logout-btn { position: absolute; top: 20px; right: 20px; width: auto; padding: 8px 16px; font-size: 0.9rem; background: transparent; border: 1px solid var(--primary-color); }
+        #logout-btn:hover { background: var(--primary-color); }
+
+        /* --- Dashboard Styles --- */
+        .message-card {
+            background: var(--background-color); padding: 15px; border-radius: 8px; border-left: 4px solid var(--secondary-color);
+            margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.5s ease forwards;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-info p { margin: 0; }
+        .message-info .channel { font-weight: 700; color: #fff; }
+        .message-info .content-preview { font-size: 0.9rem; color: #aaa; margin-top: 4px; font-style: italic; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; }
+
+        /* --- Toast Notifications --- */
+        .toast {
+            position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 15px 25px; border-radius: 8px; font-weight: 500;
+            color: white; box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: bottom 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); z-index: 1000;
+        }
+        .toast.show { bottom: 30px; }
+        .toast.success { background-color: var(--success-color); }
+        .toast.error { background-color: var(--error-color); }
+
+        /* --- Responsive Design --- */
+        @media (max-width: 768px) {
+            .main-container { padding: 10px; }
+            .view { padding: 20px; }
+            .grid-2, .dashboard-header { grid-template-columns: 1fr; flex-direction: column; gap: 1rem; }
+            .message-card { flex-direction: column; align-items: flex-start; gap: 10px; }
+            #logout-btn { position: static; width: 100%; margin-top: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Login View -->
+        <div class="view" id="login-view">
+            <h1>Announcer Login</h1>
+            <form id="login-form">
+                <div class="form-group"><label for="username">Username</label><input type="text" id="username" required></div>
+                <div class="form-group"><label for="password">Password</label><input type="password" id="password" required></div>
+                <button type="submit" class="btn btn-primary"><span class="btn-text">Login</span></button>
+            </form>
+        </div>
+
+        <!-- This wrapper holds all authenticated views -->
+        <div id="app-wrapper" class="hidden">
+            <button id="logout-btn" class="btn">Logout</button>
+            
+            <!-- Announcer / Editor View (reused form) -->
+            <div class="view hidden" id="form-view">
+                <h1 id="form-title">Create Announcement</h1>
+                <form id="webhook-form">
+                    <!-- Form content is dynamically generated by JS -->
+                </form>
+            </div>
+
+            <!-- Dashboard View -->
+            <div class="view hidden" id="dashboard-view">
+                <div class="dashboard-header">
+                    <h1>Dashboard</h1>
+                    <button id="new-announcement-btn" class="btn btn-primary" style="width:auto; padding: 12px 20px;">
+                        Make a New Announcement
+                    </button>
+                </div>
+                <div id="sent-messages-list">
+                    <p>No messages sent in this session yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- State Management ---
+            let sentMessages = []; // Array to store {id, webhookUrl, payload, channelName}
+            let currentView = 'login';
+            let editingMessageIndex = -1;
+
+            // --- DOM Element References ---
+            const views = {
+                login: document.getElementById('login-view'),
+                dashboard: document.getElementById('dashboard-view'),
+                form: document.getElementById('form-view'),
+            };
+            const appWrapper = document.getElementById('app-wrapper');
+            const loginForm = document.getElementById('login-form');
+            const logoutBtn = document.getElementById('logout-btn');
+            const dashboardList = document.getElementById('sent-messages-list');
+            const newAnnouncementBtn = document.getElementById('new-announcement-btn');
+            const toast = document.getElementById('toast');
+
+            // --- Form Template ---
+            const formHTML = `
+                <div class="grid-2">
+                    <div class="form-group"><label for="webhook-url">Webhook URL*</label><input type="url" id="webhook-url" placeholder="https://discord.com/api/webhooks/..." required></div>
+                    <div class="form-group"><label for="channel-name">Channel Name</label><input type="text" id="channel-name" placeholder="For your reference"></div>
+                </div>
+                <div class="form-group"><label for="message-content">Message Content</label><textarea id="message-content" placeholder="Your main message text (supports markdown)"></textarea></div>
+                <div class="embed-section">
+                    <h2>Embed Builder (All optional)</h2>
+                    <div class="grid-2">
+                        <div class="form-group"><label for="embed-title">Embed Title</label><input type="text" id="embed-title"></div>
+                        <div class="form-group"><label for="embed-color">Embed Color</label><input type="color" id="embed-color" value="#ff0000"></div>
+                    </div>
+                    <div class="form-group"><label for="embed-description">Embed Description</label><textarea id="embed-description" placeholder="Main body of the embed (supports markdown)"></textarea></div>
+                    <div class="grid-2">
+                        <div class="form-group"><label for="embed-author">Author Name</label><input type="text" id="embed-author"></div>
+                        <div class="form-group"><label for="embed-author-icon">Author Icon URL</label><input type="url" id="embed-author-icon" placeholder="https://..."></div>
+                    </div>
+                     <div class="grid-2">
+                        <div class="form-group"><label for="embed-image">Image URL</label><input type="url" id="embed-image" placeholder="Large image at the bottom"></div>
+                        <div class="form-group"><label for="embed-thumbnail">Thumbnail URL</label><input type="url" id="embed-thumbnail" placeholder="Small image in top-right"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Fields</label>
+                        <div id="fields-container"></div>
+                        <button type="button" id="add-field-btn" class="btn btn-secondary" style="width: auto; padding: 10px 20px; margin-top: 10px;">Add Field</button>
+                    </div>
+                     <div class="grid-2">
+                        <div class="form-group"><label for="embed-footer">Footer Text</label><input type="text" id="embed-footer"></div>
+                        <div class="form-group"><label for="embed-footer-icon">Footer Icon URL</label><input type="url" id="embed-footer-icon" placeholder="https://..."></div>
+                    </div>
+                </div>
+                <button type="submit" id="submit-btn" class="btn btn-primary" style="margin-top: 2rem;">
+                     <span class="btn-text">Send Announcement</span><div class="spinner"></div>
+                </button>
+                <button type="button" id="cancel-edit-btn" class="btn btn-secondary hidden" style="margin-top: 1rem;">
+                     <span class="btn-text">Cancel</span>
+                </button>
+            `;
+
+            // --- View Management ---
+            const switchView = (viewName) => {
+                currentView = viewName;
+                Object.keys(views).forEach(key => views[key].classList.add('hidden'));
+                if (views[viewName]) {
+                    views[viewName].classList.remove('hidden');
+                }
+            };
+            
+            // --- Authentication ---
+            const CORRECT_USER = 'Kazuma';
+            const CORRECT_PASS = 'Kazuma';
+
+            if (sessionStorage.getItem('isLoggedIn') === 'true') {
+                appWrapper.classList.remove('hidden');
+                switchView('dashboard');
+                renderDashboard();
+            } else {
+                switchView('login');
+            }
+
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (document.getElementById('username').value === CORRECT_USER && document.getElementById('password').value === CORRECT_PASS) {
+                    sessionStorage.setItem('isLoggedIn', 'true');
+                    appWrapper.classList.remove('hidden');
+                    switchView('dashboard');
+                } else {
+                    showToast('Invalid username or password', 'error');
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                sessionStorage.removeItem('isLoggedIn');
+                sentMessages = [];
+                appWrapper.classList.add('hidden');
+                switchView('login');
+            });
+            
+            // --- Form Setup & Logic ---
+            const setupForm = (mode, messageIndex = -1) => {
+                const formContainer = document.getElementById('webhook-form');
+                formContainer.innerHTML = formHTML; // Inject the form template
+                
+                const formTitle = document.getElementById('form-title');
+                const submitBtn = document.getElementById('submit-btn');
+                const cancelBtn = document.getElementById('cancel-edit-btn');
+                const fieldsContainer = document.getElementById('fields-container');
+
+                formContainer.onsubmit = handleFormSubmit;
+                document.getElementById('add-field-btn').onclick = addField;
+                fieldsContainer.onclick = (e) => {
+                    if (e.target.classList.contains('remove-field-btn')) e.target.parentElement.remove();
+                };
+
+                if (mode === 'edit') {
+                    editingMessageIndex = messageIndex;
+                    const message = sentMessages[messageIndex];
+                    formTitle.textContent = 'Edit Announcement';
+                    submitBtn.querySelector('.btn-text').textContent = 'Save Changes';
+                    cancelBtn.classList.remove('hidden');
+                    cancelBtn.onclick = () => switchView('dashboard');
+                    populateForm(message.payload, message.webhookUrl, message.channelName);
+                } else {
+                    editingMessageIndex = -1;
+                    formTitle.textContent = 'Create Announcement';
+                    submitBtn.querySelector('.btn-text').textContent = 'Send Announcement';
+                    cancelBtn.classList.add('hidden');
+                    formContainer.reset();
+                }
+                switchView('form');
+            };
+            
+            newAnnouncementBtn.addEventListener('click', () => setupForm('create'));
+
+            // --- Dashboard Logic ---
+            const renderDashboard = () => {
+                if (sentMessages.length === 0) {
+                    dashboardList.innerHTML = '<p>No messages sent in this session yet.</p>';
+                    return;
+                }
+                dashboardList.innerHTML = sentMessages.map((msg, index) => {
+                    const content = msg.payload.content || (msg.payload.embeds && msg.payload.embeds[0].title) || 'No Content';
+                    return `
+                        <div class="message-card">
+                            <div class="message-info">
+                                <p class="channel">${msg.channelName}</p>
+                                <p class="content-preview">${content.substring(0, 50)}${content.length > 50 ? '...' : ''}</p>
+                            </div>
+                            <div class="message-actions">
+                                <button class="btn btn-edit" data-index="${index}">Edit</button>
+                                <button class="btn btn-delete" data-index="${index}">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            };
+
+            dashboardList.addEventListener('click', (e) => {
+                const index = e.target.dataset.index;
+                if (!index) return;
+
+                if (e.target.matches('.edit-btn')) {
+                    setupForm('edit', index);
+                }
+                if (e.target.matches('.delete-btn')) {
+                    if (confirm('Are you sure you want to permanently delete this message?')) {
+                        deleteMessage(index);
+                    }
+                }
+            });
+
+            async function deleteMessage(index) {
+                const message = sentMessages[index];
+                const deleteUrl = `${message.webhookUrl}/messages/${message.id}`;
+                try {
+                    const response = await fetch(deleteUrl, { method: 'DELETE' });
+                    if (response.ok) {
+                        showToast('Message deleted successfully!', 'success');
+                        sentMessages.splice(index, 1);
+                        renderDashboard();
+                    } else {
+                        showToast(`Error deleting message: ${response.status}`, 'error');
+                    }
+                } catch (err) {
+                    showToast('Network error during deletion.', 'error');
+                }
+            }
+
+            // --- Core API Functions ---
+            const handleFormSubmit = async (e) => {
+                e.preventDefault();
+                const submitBtn = document.getElementById('submit-btn');
+                setLoading(submitBtn, true);
+
+                const webhookUrl = document.getElementById('webhook-url').value;
+                const payload = buildPayload();
+                
+                if (!webhookUrl) {
+                    showToast('Webhook URL is required!', 'error');
+                    setLoading(submitBtn, false);
+                    return;
+                }
+                
+                let url, method;
+                if (editingMessageIndex > -1) { // Editing existing message
+                    const message = sentMessages[editingMessageIndex];
+                    url = `${message.webhookUrl}/messages/${message.id}?wait=true`;
+                    method = 'PATCH';
+                } else { // Creating new message
+                    url = `${webhookUrl}?wait=true`; // wait=true is crucial to get message ID back
+                    method = 'POST';
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (response.ok) {
+                        const responseData = await response.json();
+                        if (editingMessageIndex > -1) {
+                            sentMessages[editingMessageIndex].payload = payload;
+                            showToast('Message updated successfully!', 'success');
+                        } else {
+                            sentMessages.push({
+                                id: responseData.id,
+                                webhookUrl: webhookUrl,
+                                payload: payload,
+                                channelName: document.getElementById('channel-name').value || 'Unknown Channel'
+                            });
+                            showToast('Announcement sent successfully!', 'success');
+                        }
+                        renderDashboard();
+                        switchView('dashboard');
+                    } else {
+                        const errorData = await response.json();
+                        console.error('Discord API Error:', errorData);
+                        showToast(`Error: ${response.statusText}. Check console.`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Fetch Error:', error);
+                    showToast('A network error occurred.', 'error');
+                } finally {
+                    setLoading(submitBtn, false);
+                }
+            };
+            
+            // --- Helper Functions ---
+            const addField = (name = '', value = '') => {
+                const container = document.getElementById('fields-container');
+                const fieldGroup = document.createElement('div');
+                fieldGroup.className = 'field-group';
+                fieldGroup.innerHTML = `
+                    <input type="text" class="field-name" placeholder="Field Name" value="${name}">
+                    <input type="text" class="field-value" placeholder="Field Value" value="${value}">
+                    <button type="button" class="remove-field-btn">&times;</button>
+                `;
+                container.appendChild(fieldGroup);
+            };
+
+            const populateForm = (payload, webhookUrl, channelName) => {
+                document.getElementById('webhook-url').value = webhookUrl;
+                document.getElementById('webhook-url').disabled = true; // Can't change webhook on edit
+                document.getElementById('channel-name').value = channelName;
+                document.getElementById('message-content').value = payload.content || '';
+
+                if (payload.embeds && payload.embeds[0]) {
+                    const embed = payload.embeds[0];
+                    document.getElementById('embed-title').value = embed.title || '';
+                    document.getElementById('embed-description').value = embed.description || '';
+                    document.getElementById('embed-color').value = embed.color ? `#${embed.color.toString(16).padStart(6, '0')}` : '#ff0000';
+                    document.getElementById('embed-author').value = embed.author?.name || '';
+                    document.getElementById('embed-author-icon').value = embed.author?.icon_url || '';
+                    document.getElementById('embed-image').value = embed.image?.url || '';
+                    document.getElementById('embed-thumbnail').value = embed.thumbnail?.url || '';
+                    document.getElementById('embed-footer').value = embed.footer?.text || '';
+                    document.getElementById('embed-footer-icon').value = embed.footer?.icon_url || '';
+                    if (embed.fields) {
+                        embed.fields.forEach(field => addField(field.name, field.value));
+                    }
+                }
+            };
+
+            const buildPayload = () => {
+                const payload = { content: document.getElementById('message-content').value.trim() || null };
+                const embed = {};
+                
+                const getVal = id => document.getElementById(id).value.trim();
+                const colorHex = getVal('embed-color');
+
+                if (colorHex) embed.color = parseInt(colorHex.substring(1), 16);
+                const fieldsMap = { title: 'embed-title', description: 'embed-description' };
+                Object.keys(fieldsMap).forEach(key => { if(getVal(fieldsMap[key])) embed[key] = getVal(fieldsMap[key]); });
+                
+                if (getVal('embed-author')) embed.author = { name: getVal('embed-author'), icon_url: getVal('embed-author-icon') || undefined };
+                if (getVal('embed-image')) embed.image = { url: getVal('embed-image') };
+                if (getVal('embed-thumbnail')) embed.thumbnail = { url: getVal('embed-thumbnail') };
+                if (getVal('embed-footer')) embed.footer = { text: getVal('embed-footer'), icon_url: getVal('embed-footer-icon') || undefined };
+
+                const fields = [];
+                document.querySelectorAll('.field-group').forEach(group => {
+                    const name = group.querySelector('.field-name').value.trim();
+                    const value = group.querySelector('.field-value').value.trim();
+                    if (name && value) fields.push({ name, value, inline: false });
+                });
+                if (fields.length > 0) embed.fields = fields;
+
+                if (Object.keys(embed).length > 1) { payload.embeds = [embed]; }
+                return payload;
+            };
+
+            const setLoading = (btn, isLoading) => {
+                btn.classList.toggle('loading', isLoading);
+                btn.disabled = isLoading;
+            };
+
+            let toastTimer;
+            const showToast = (message, type = 'success') => {
+                clearTimeout(toastTimer);
+                toast.textContent = message;
+                toast.className = `toast show ${type}`;
+                toastTimer = setTimeout(() => { toast.classList.remove('show'); }, 4000);
+            };
+        });
+    </script>
+</body>
+</html>
