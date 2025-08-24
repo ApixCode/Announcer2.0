@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container">
+        <div class="dashboard-container">
+
+            <!-- SECTION 1: Webhook Setup (Shown if no webhook is saved) -->
+            <div id="webhookSetup" class="hidden">
+                <h2>Setup Your Webhook</h2>
+                <form id="webhookSetupForm">
+                    <div class="form-section">
+                        <label for="webhookUrl">Webhook URL</label>
+                        <input type="url" id="webhookUrl" placeholder="Enter your Discord webhook URL" required>
+                    </div>
+                    <div class="form-section">
+                        <label for="channelName">Channel Name (for display)</label>
+                        <input type="text" id="channelName" placeholder="e.g., #announcements" required>
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="cool-button"><span>Save Webhook</span></button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- SECTION 2: Main Dashboard (Shown if webhook is saved) -->
+            <div id="mainDashboard" class="hidden">
+                <h2 id="dashboardTitle"></h2>
+                <div class="button-group">
+                    <button id="showAnnounceFormBtn" class="cool-button"><span>New Announcement</span></button>
+                    <button id="editLastMessageBtn" class="cool-button btn-secondary"><span>Edit Last</span></button>
+                    <button id="deleteWebhookBtn" class="cool-button btn-danger"><span>Delete Webhook</span></button>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Announcement Form (Toggled by button) -->
+            <div id="announcementFormContainer" class="hidden" style="margin-top: 30px;">
+                <h2 id="formTitle">Create Announcement</h2>
+                <form id="announcementForm">
+                    <!-- Simple Message -->
+                    <div class="form-section">
+                        <label for="messageContent">Message Content (Optional)</label>
+                        <textarea id="messageContent" placeholder="You can use @everyone, @here, or role/user mentions here."></textarea>
+                    </div>
+
+                    <!-- Embed Message -->
+                    <div class="form-section">
+                        <h3>Embed Message (Optional)</h3>
+                        
+                        <label for="embedTitle">Title</label>
+                        <input type="text" id="embedTitle">
+                        
+                        <label for="embedDescription">Description</label>
+                        <textarea id="embedDescription" placeholder="You can use Markdown here. (e.g., **bold**, *italic*)"></textarea>
+                        
+                        <label for="embedAuthor">Author</label>
+                        <input type="text" id="embedAuthor">
+                        
+                        <label for="embedAuthorIcon">Author Icon URL</label>
+                        <input type="url" id="embedAuthorIcon">
+                        
+                        <label for="embedImage">Image URL</label>
+                        <input type="url" id="embedImage">
+                        
+                        <label for="embedThumbnail">Thumbnail URL</label>
+                        <input type="url" id="embedThumbnail">
+                        
+                        <label for="embedFooter">Footer</label>
+                        <input type="text" id="embedFooter">
+                        
+                        <label for="embedFooterIcon">Footer Icon URL</label>
+                        <input type="url" id="embedFooterIcon">
+                    </div>
+
+                    <!-- Embed Fields -->
+                    <div class="form-section">
+                        <h3>Embed Fields</h3>
+                        <div id="fieldsContainer" class="field-container">
+                            <!-- Fields will be dynamically added here -->
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="addFieldBtn" class="cool-button btn-secondary"><span>Add Field</span></button>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button type="submit" class="cool-button"><span>Send Announcement</span></button>
+                        <button type="button" id="cancelBtn" class="cool-button btn-danger"><span>Cancel</span></button>
+                    </div>
+                </form>
+            </div>
+             <!-- Status Message -->
+             <div id="statusMessage" class="status-message hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const webhookSetup = document.getElementById('webhookSetup');
+            const mainDashboard = document.getElementById('mainDashboard');
+            const announcementFormContainer = document.getElementById('announcementFormContainer');
+            const webhookSetupForm = document.getElementById('webhookSetupForm');
+            const announcementForm = document.getElementById('announcementForm');
+            const dashboardTitle = document.getElementById('dashboardTitle');
+            const showAnnounceFormBtn = document.getElementById('showAnnounceFormBtn');
+            const editLastMessageBtn = document.getElementById('editLastMessageBtn');
+            const deleteWebhookBtn = document.getElementById('deleteWebhookBtn');
+            const addFieldBtn = document.getElementById('addFieldBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const fieldsContainer = document.getElementById('fieldsContainer');
+            const formTitle = document.getElementById('formTitle');
+            const statusMessage = document.getElementById('statusMessage');
+
+            let isEditing = false;
+
+            // --- CORE LOGIC ---
+
+            const checkStoredWebhook = () => {
+                const url = localStorage.getItem('webhookUrl');
+                const name = localStorage.getItem('channelName');
+                if (url && name) {
+                    dashboardTitle.textContent = `Dashboard for: ${name}`;
+                    webhookSetup.classList.add('hidden');
+                    mainDashboard.classList.remove('hidden');
+                    announcementFormContainer.classList.add('hidden');
+                } else {
+                    webhookSetup.classList.remove('hidden');
+                    mainDashboard.classList.add('hidden');
+                }
+            };
+
+            const saveWebhook = (e) => {
+                e.preventDefault();
+                const url = document.getElementById('webhookUrl').value;
+                const name = document.getElementById('channelName').value;
+                localStorage.setItem('webhookUrl', url);
+                localStorage.setItem('channelName', name);
+                checkStoredWebhook();
+            };
+
+            const deleteWebhook = () => {
+                if (confirm('Are you sure you want to delete this webhook configuration?')) {
+                    localStorage.removeItem('webhookUrl');
+                    localStorage.removeItem('channelName');
+                    localStorage.removeItem('lastMessageId');
+                    checkStoredWebhook();
+                }
+            };
+
+            const toggleForm = (editing = false) => {
+                isEditing = editing;
+                if (editing) {
+                    formTitle.textContent = 'Edit Last Announcement';
+                    if (!localStorage.getItem('lastMessageId')) {
+                        showStatus('No last message found to edit!', 'error');
+                        return;
+                    }
+                } else {
+                    formTitle.textContent = 'Create Announcement';
+                }
+                mainDashboard.classList.add('hidden');
+                announcementFormContainer.classList.remove('hidden');
+                announcementForm.reset();
+                fieldsContainer.innerHTML = '';
+            };
+
+            const addField = () => {
+                const fieldId = Date.now();
+                const fieldHTML = `
+                    <div class="field-item" id="field-${fieldId}">
+                        <button type="button" class="remove-field" onclick="document.getElementById('field-${fieldId}').remove()">X</button>
+                        <div>
+                            <label>Field Name</label>
+                            <input type="text" class="field-name" placeholder="Title of the field">
+                        </div>
+                        <div>
+                            <label>Field Value</label>
+                            <input type="text" class="field-value" placeholder="Content of the field">
+                        </div>
+                        <div class="inline-checkbox">
+                            <input type="checkbox" class="field-inline">
+                            <label>Inline?</label>
+                        </div>
+                    </div>
+                `;
+                fieldsContainer.insertAdjacentHTML('beforeend', fieldHTML);
+            };
+
+            const showStatus = (message, type = 'success') => {
+                statusMessage.textContent = message;
+                statusMessage.className = `status-message status-${type}`;
+                statusMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    statusMessage.classList.add('hidden');
+                }, 4000);
+            };
+
+            const sendAnnouncement = async (e) => {
+                e.preventDefault();
+                let webhookUrl = localStorage.getItem('webhookUrl');
+                if (!webhookUrl) return;
+
+                const messageId = localStorage.getItem('lastMessageId');
+
+                // Construct payload
+                const payload = {
+                    content: document.getElementById('messageContent').value || null,
+                    embeds: []
+                };
+
+                const embed = {
+                    title: document.getElementById('embedTitle').value,
+                    description: document.getElementById('embedDescription').value,
+                    color: 16711680, // Red color
+                    author: {
+                        name: document.getElementById('embedAuthor').value,
+                        icon_url: document.getElementById('embedAuthorIcon').value
+                    },
+                    image: { url: document.getElementById('embedImage').value },
+                    thumbnail: { url: document.getElementById('embedThumbnail').value },
+                    footer: {
+                        text: document.getElementById('embedFooter').value,
+                        icon_url: document.getElementById('embedFooterIcon').value
+                    },
+                    fields: []
+                };
+
+                // Collect fields
+                document.querySelectorAll('.field-item').forEach(item => {
+                    const name = item.querySelector('.field-name').value;
+                    const value = item.querySelector('.field-value').value;
+                    const inline = item.querySelector('.field-inline').checked;
+                    if (name && value) {
+                        embed.fields.push({ name, value, inline });
+                    }
+                });
+
+                // Only add embed object if it contains any data
+                if (Object.values(embed).some(val => (typeof val === 'string' && val) || (Array.isArray(val) && val.length) || (typeof val === 'object' && Object.values(val).some(v => v)))) {
+                    payload.embeds.push(embed);
+                }
+
+                // If nothing to send, abort.
+                if (!payload.content && payload.embeds.length === 0) {
+                    showStatus('You must provide some content or embed data!', 'error');
+                    return;
+                }
+
+                try {
+                    let method = 'POST';
+                    if (isEditing && messageId) {
+                        method = 'PATCH';
+                        webhookUrl += `/messages/${messageId}`;
+                    } else {
+                        // We add ?wait=true to get the message ID back from Discord for editing later
+                        webhookUrl += '?wait=true';
+                    }
+
+                    const response = await fetch(webhookUrl, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        if (method === 'POST') {
+                            const responseData = await response.json();
+                            localStorage.setItem('lastMessageId', responseData.id); // Save the new message ID
+                        }
+                        showStatus(isEditing ? 'Message edited successfully!' : 'Announcement sent successfully!', 'success');
+                        checkStoredWebhook(); // Go back to dashboard
+                    } else {
+                        const errorData = await response.json();
+                        console.error('Discord API Error:', errorData);
+                        showStatus(`Error: ${JSON.stringify(errorData.message || errorData)}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Fetch Error:', error);
+                    showStatus('A network error occurred. Check the console and your webhook URL.', 'error');
+                }
+            };
+
+
+            // --- EVENT LISTENERS ---
+            webhookSetupForm.addEventListener('submit', saveWebhook);
+            deleteWebhookBtn.addEventListener('click', deleteWebhook);
+            showAnnounceFormBtn.addEventListener('click', () => toggleForm(false));
+            editLastMessageBtn.addEventListener('click', () => toggleForm(true));
+            cancelBtn.addEventListener('click', checkStoredWebhook);
+            addFieldBtn.addEventListener('click', addField);
+            announcementForm.addEventListener('submit', sendAnnouncement);
+
+
+            // --- INITIALIZATION ---
+            checkStoredWebhook();
+        });
+    </script>
+</body>
+</html>
