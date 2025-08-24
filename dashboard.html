@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-theme="dark">
+    <div class="background-grid"></div>
+    <div class="aurora-background">
+        <div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div>
+    </div>
+    
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="profile-box">
+                <div class="avatar" id="avatarLetter"></div>
+                <h2 id="welcomeUsername"></h2>
+                <p id="userRole"></p>
+            </div>
+            <nav class="sidebar-nav">
+                <button id="navWebhooks" class="active">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <span>Webhooks</span>
+                </button>
+                <button id="navAccounts" class="hidden">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 12a4 4 0 110-8 4 4 0 010 8z"></path></svg>
+                    <span>Accounts</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="cool-button danger" id="importBtn" style="width:100%;">Import</button>
+                <button class="cool-button danger" id="exportBtn" style="width:100%;">Export</button>
+                <button class="cool-button" id="themeToggle" style="width:100%; justify-content: center;">Theme</button>
+                <button class="cool-button" id="logoutBtn" style="width:100%; justify-content: center;">Logout</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- VIEW 1: Webhooks -->
+            <div id="webhookListView" class="view-container">
+                <div class="content-header">
+                    <h1 class="title-glow">My Webhooks</h1>
+                    <button id="showAddWebhookModalBtn" class="cool-button"><span>+ Add New</span></button>
+                </div>
+                <div id="webhookList"></div>
+                <div id="noWebhooksMessage" class="hidden glass-card" style="padding: 40px; text-align:center;">
+                    <h2>No webhooks found.</h2>
+                    <p>Click "+ Add New" to get started or import a configuration file!</p>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Announcement Form -->
+            <div id="announcementFormView" class="view-container hidden">
+                <div class="content-header">
+                    <h1 id="formTitle" class="title-glow">Create Announcement</h1>
+                </div>
+                <form id="announcementForm">
+                    <!-- Form sections will be dynamically generated here from a template -->
+                </form>
+            </div>
+
+            <!-- VIEW 3: Accounts Management -->
+            <div id="accountsView" class="view-container hidden">
+                 <div class="content-header">
+                    <h1 class="title-glow">Manage Accounts</h1>
+                </div>
+                <div class="glass-card" style="text-align:left;">
+                    <ul id="userList" style="list-style:none; padding:0; max-height: 250px; overflow-y: auto;"></ul>
+                    <form id="createAccountForm" style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+                        <h3>Create New Account</h3>
+                        <div class="input-group"><input type="text" id="newUsername" required><label>Username</label></div>
+                        <div class="input-group"><input type="password" id="newPassword" required><label>Password</label></div>
+                        <div class="input-group"><select id="newRole" required><option value="user">User</option><option value="staff">Staff</option></select><label>Role</label></div>
+                        <button type="submit" class="cool-button"><span>Create Account</span></button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL for adding webhook -->
+    <div id="webhookModal" class="modal-overlay">
+        <div class="glass-card modal-content">
+            <h2>Add New Webhook</h2>
+            <form id="webhookForm">
+                <div class="input-group"><input type="url" id="webhookUrlInput" required><label>Webhook URL</label></div>
+                <div class="input-group"><input type="text" id="webhookNameInput" required><label>Display Name</label></div>
+                <div style="display:flex; justify-content:center; gap:10px; margin-top:20px;">
+                    <button type="submit" class="cool-button"><span>Save</span></button>
+                    <button type="button" class="cool-button danger" id="closeWebhookModalBtn"><span>Cancel</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="statusMessage" class="hidden"></div>
+    <input type="file" id="importFileInput" class="hidden" accept=".json">
+
+    <script>
+        // --- AUTHENTICATION & INITIALIZATION ---
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (!currentUser) window.location.href = 'index.html';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- STATE & CONFIG ---
+            let webhooks = [];
+            let allUsers = [];
+            let activeWebhookId = null;
+            let isEditingLastMessage = false;
+            const webhookStorageKey = `webhooks_${currentUser.username}`;
+
+            // --- DATA MANAGEMENT ---
+            const loadData = () => {
+                webhooks = JSON.parse(localStorage.getItem(webhookStorageKey)) || [];
+                allUsers = JSON.parse(localStorage.getItem('user_accounts')) || [];
+            };
+            const saveData = () => {
+                localStorage.setItem(webhookStorageKey, JSON.stringify(webhooks));
+                localStorage.setItem('user_accounts', JSON.stringify(allUsers));
+            };
+            
+            // --- UI & THEME ---
+            const setupUI = () => {
+                document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
+                document.getElementById('avatarLetter').textContent = currentUser.username.charAt(0).toUpperCase();
+                document.getElementById('welcomeUsername').textContent = currentUser.username;
+                document.getElementById('userRole').textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+                if (currentUser.role === 'admin' || currentUser.role === 'staff') {
+                    document.getElementById('navAccounts').classList.remove('hidden');
+                }
+            };
+
+            const showStatus = (message, type = 'success') => {
+                const el = document.getElementById('statusMessage');
+                el.textContent = message;
+                el.className = `status-message status-${type}`;
+                setTimeout(() => el.classList.add('hidden'), 4000);
+            };
+
+            const showView = (viewId) => {
+                document.querySelectorAll('.view-container').forEach(v => v.classList.add('hidden'));
+                document.getElementById(viewId).classList.remove('hidden');
+                document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+                if (viewId === 'webhookListView') document.getElementById('navWebhooks').classList.add('active');
+                if (viewId === 'accountsView') document.getElementById('navAccounts').classList.add('active');
+            };
+
+            // --- RENDER FUNCTIONS ---
+            const renderWebhookList = () => {
+                const listEl = document.getElementById('webhookList');
+                listEl.innerHTML = '';
+                document.getElementById('noWebhooksMessage').classList.toggle('hidden', webhooks.length > 0);
+                webhooks.forEach((wh, i) => {
+                    const card = document.createElement('div');
+                    card.className = 'webhook-card';
+                    card.style.animationDelay = `${i * 50}ms`;
+                    card.innerHTML = `
+                        <h3>${wh.name}</h3><p>${wh.url}</p>
+                        <div class="card-actions">
+                            <button class="cool-button announce-btn" data-id="${wh.id}">Announce</button>
+                            ${wh.lastMessageId ? `<button class="cool-button edit-last-btn" data-id="${wh.id}">Edit Last</button>` : ''}
+                            <button class="cool-button danger delete-btn" data-id="${wh.id}">Delete</button>
+                        </div>`;
+                    listEl.appendChild(card);
+                });
+            };
+
+            const renderAnnouncementForm = () => {
+                const formEl = document.getElementById('announcementForm');
+                formEl.innerHTML = `
+                    <div class="form-section"><label for="messageContent">Message Content</label><textarea id="messageContent"></textarea></div>
+                    <div class="form-section"><h3>Embed</h3><div class="color-picker-group"><label for="embedColor">Color</label><input type="color" id="embedColor" value="#e60073"></div><div class="input-group"><input type="text" id="embedTitle"><label>Title</label></div><div class="input-group"><textarea id="embedDescription"></textarea><label>Description</label></div><div class="input-group"><input type="text" id="embedAuthor"><label>Author</label></div><div class="input-group"><input type="url" id="embedAuthorIcon"><label>Author Icon URL</label></div><div class="input-group"><input type="url" id="embedImage"><label>Image URL</label></div><div class="input-group"><input type="url" id="embedThumbnail"><label>Thumbnail URL</label></div><div class="input-group"><input type="text" id="embedFooter"><label>Footer</label></div><div class="input-group"><input type="url" id="embedFooterIcon"><label>Footer Icon URL</label></div></div>
+                    <div class="form-section"><h3>Fields</h3><div id="fieldsContainer"></div><button type="button" id="addFieldBtn" class="cool-button">Add Field</button></div>
+                    <div style="text-align:center;"><button type="submit" class="cool-button">Send Announcement</button></div>`;
+                formEl.querySelector('#addFieldBtn').addEventListener('click', addField);
+            };
+
+            const renderUserList = () => {
+                const listEl = document.getElementById('userList');
+                listEl.innerHTML = '';
+                allUsers.forEach(user => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; padding: 10px; border-bottom: 1px solid var(--border);"><span>${user.username} <span style="opacity:0.7">(${user.role})</span></span> ${user.role !== 'admin' ? `<button class="cool-button danger delete-user-btn" data-username="${user.username}" style="padding:5px 10px; font-size:12px;">Delete</button>` : ''}</div>`;
+                    listEl.appendChild(li);
+                });
+                document.querySelectorAll('.delete-user-btn').forEach(btn => btn.addEventListener('click', deleteAccount));
+            };
+
+            // --- EVENT HANDLERS ---
+            const addField = () => {
+                const id = Date.now();
+                document.getElementById('fieldsContainer').insertAdjacentHTML('beforeend', `<div class="input-group" style="border:1px solid var(--border); padding:15px; border-radius:8px; position:relative;"><button type="button" onclick="this.parentElement.remove()" style="position:absolute; top:5px; right:5px; background:var(--primary-color);color:white;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;">X</button><input type="text" class="field-name"><label>Field Name</label><input type="text" class="field-value" style="margin-top:10px;"><label>Field Value</label><div style="display:flex; align-items:center; margin-top:10px;"><input type="checkbox" id="inline-${id}" class="field-inline"><label for="inline-${id}" style="position:static; opacity:1;">Inline?</label></div></div>`);
+            };
+
+            const prepareAnnouncementForm = (webhookId, isEditing = false) => {
+                activeWebhookId = webhookId; isEditingLastMessage = isEditing;
+                const webhook = webhooks.find(wh => wh.id === webhookId);
+                if (isEditing && !webhook.lastMessageId) return showStatus('No message to edit!', 'error');
+                
+                renderAnnouncementForm();
+                document.getElementById('formTitle').textContent = isEditing ? `Edit: ${webhook.name}` : `Announce: ${webhook.name}`;
+                document.getElementById('announcementForm').reset();
+                showView('announcementFormView');
+            };
+
+            const handleSendAnnouncement = async (e) => {
+                e.preventDefault();
+                const webhook = webhooks.find(wh => wh.id === activeWebhookId);
+                const decimalColor = parseInt(document.getElementById('embedColor').value.substring(1), 16);
+                
+                const payload = { content: document.getElementById('messageContent').value || null, embeds: [] };
+                const embed = {
+                    title: document.getElementById('embedTitle').value, description: document.getElementById('embedDescription').value, color: decimalColor,
+                    author: { name: document.getElementById('embedAuthor').value, icon_url: document.getElementById('embedAuthorIcon').value }, image: { url: document.getElementById('embedImage').value }, thumbnail: { url: document.getElementById('embedThumbnail').value }, footer: { text: document.getElementById('embedFooter').value, icon_url: document.getElementById('embedFooterIcon').value },
+                    fields: Array.from(document.querySelectorAll('.field-name')).map((nameInput, i) => ({ name: nameInput.value, value: document.querySelectorAll('.field-value')[i].value, inline: document.querySelectorAll('.field-inline')[i].checked })).filter(f => f.name && f.value)
+                };
+
+                if (Object.values(embed).some(v => v && (typeof v !== 'object' || Object.values(v).some(subV => subV)))) payload.embeds.push(embed);
+                if (!payload.content && !payload.embeds.length) return showStatus('Cannot send an empty message!', 'error');
+
+                let url = webhook.url + (isEditingLastMessage ? `/messages/${webhook.lastMessageId}` : '?wait=true');
+                try {
+                    const res = await fetch(url, { method: isEditingLastMessage ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!res.ok) throw new Error(JSON.stringify(await res.json()));
+                    if (!isEditingLastMessage) { const data = await res.json(); webhook.lastMessageId = data.id; saveData(); }
+                    showStatus('Message sent successfully!', 'success');
+                    showView('webhookListView'); renderWebhookList();
+                } catch (err) { showStatus(`Error: ${err.message}`, 'error'); }
+            };
+            
+            // --- EVENT LISTENERS ---
+            document.getElementById('navWebhooks').addEventListener('click', () => { showView('webhookListView'); renderWebhookList(); });
+            document.getElementById('navAccounts').addEventListener('click', () => { showView('accountsView'); renderUserList(); });
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                let theme = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                document.body.setAttribute('data-theme', theme); localStorage.setItem('theme', theme);
+            });
+            document.getElementById('logoutBtn').addEventListener('click', () => { sessionStorage.removeItem('currentUser'); window.location.href = 'index.html'; });
+            
+            // Webhook modal listeners
+            const webhookModal = document.getElementById('webhookModal');
+            document.getElementById('showAddWebhookModalBtn').addEventListener('click', () => webhookModal.classList.add('active'));
+            document.getElementById('closeWebhookModalBtn').addEventListener('click', () => webhookModal.classList.remove('active'));
+            document.getElementById('webhookForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                webhooks.push({ id: Date.now(), name: document.getElementById('webhookNameInput').value, url: document.getElementById('webhookUrlInput').value, lastMessageId: null });
+                saveData(); renderWebhookList(); e.target.reset(); webhookModal.classList.remove('active');
+            });
+
+            // Card action listeners (event delegation)
+            document.getElementById('webhookList').addEventListener('click', e => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const id = Number(btn.dataset.id);
+                if (btn.classList.contains('delete-btn')) { if (confirm('Are you sure?')) { webhooks = webhooks.filter(wh => wh.id !== id); saveData(); renderWebhookList(); }}
+                else if (btn.classList.contains('announce-btn')) { prepareAnnouncementForm(id, false); }
+                else if (btn.classList.contains('edit-last-btn')) { prepareAnnouncementForm(id, true); }
+            });
+
+            // Form submission
+            document.getElementById('announcementFormView').addEventListener('submit', handleSendAnnouncement);
+
+            // Account management
+            const createAccount = (e) => { /* ... see previous response for full logic ... */ e.preventDefault();const u=document.getElementById("newUsername").value,p=document.getElementById("newPassword").value,r=document.getElementById("newRole").value;if(allUsers.some(e=>e.username===u))return showStatus("Username exists!","error");allUsers.push({username:u,password:p,role:r}),saveData(),renderUserList(),e.target.reset(),showStatus("Account created!","success") };
+            const deleteAccount = (e) => { /* ... see previous response for full logic ... */ const u=e.target.dataset.username;confirm(`Delete ${u}?`)&&(allUsers=allUsers.filter(e=>e.username!==u),saveData(),renderUserList()) };
+            document.getElementById('accountsView').addEventListener('submit', createAccount);
+
+            // Import/Export
+            document.getElementById('exportBtn').addEventListener('click', () => { if(!webhooks.length) return showStatus('Nothing to export!', 'error'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(webhooks,null,2)],{type:'application/json'})); a.download='webhooks.json'; a.click(); URL.revokeObjectURL(a.href); });
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFileInput').click());
+            document.getElementById('importFileInput').addEventListener('change', (e) => { const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=(e)=>{try{const data=JSON.parse(e.target.result); if(!Array.isArray(data)) throw new Error(); if(confirm("This will overwrite current webhooks. Continue?")){webhooks=data; saveData(); renderWebhookList(); showStatus('Imported!', 'success');}}catch(err){showStatus('Invalid file!', 'error');}}; reader.readAsText(file); e.target.value=null; });
+            
+            // --- INITIALIZE APP ---
+            loadData();
+            setupUI();
+            renderWebhookList();
+            showView('webhookListView');
+        });
+    </script>
+</body>
+</html>
