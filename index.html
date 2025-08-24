@@ -9,12 +9,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
+<body data-theme="dark"> <!-- Default to dark theme -->
+    <div class="background-grid"></div>
     <div class="aurora-background">
-        <div class="aurora__item"></div>
-        <div class="aurora__item"></div>
-        <div class="aurora__item"></div>
-        <div class="aurora__item"></div>
+        <div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div>
     </div>
     <div class="container">
         <div class="glass-card login-box">
@@ -36,20 +34,54 @@
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set theme from localStorage on load
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
 
-            if (username === 'Kazuma' && password === 'Kazuma') {
-                window.location.href = 'dashboard.html';
-            } else {
+            // --- User Account Management ---
+            const getUsers = () => JSON.parse(localStorage.getItem('user_accounts')) || [];
+            const saveUsers = (users) => localStorage.setItem('user_accounts', JSON.stringify(users));
+
+            // Initialize the default admin account if it doesn't exist
+            const initializeAdmin = () => {
+                let users = getUsers();
+                if (!users.find(u => u.username === 'Kazuma')) {
+                     if (users.length === 0) {
+                        users.push({
+                            username: 'Kazuma',
+                            password: 'Kazuma',
+                            role: 'admin'
+                        });
+                        saveUsers(users);
+                    }
+                }
+            };
+            initializeAdmin();
+
+            // --- Login Logic ---
+            document.getElementById('loginForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const usernameInput = document.getElementById('username').value;
+                const passwordInput = document.getElementById('password').value;
                 const errorMessage = document.getElementById('error-message');
-                const loginForm = document.getElementById('loginForm');
-                errorMessage.textContent = 'Invalid username or password.';
-                loginForm.classList.add('shake');
-                setTimeout(() => loginForm.classList.remove('shake'), 500);
-            }
+                const users = getUsers();
+                
+                const foundUser = users.find(user => user.username === usernameInput);
+
+                if (foundUser && foundUser.password === passwordInput) {
+                    sessionStorage.setItem('currentUser', JSON.stringify({
+                        username: foundUser.username,
+                        role: foundUser.role
+                    }));
+                    window.location.href = 'dashboard.html';
+                } else {
+                    errorMessage.textContent = 'Invalid username or password.';
+                    const loginForm = document.getElementById('loginForm');
+                    loginForm.classList.add('shake');
+                    setTimeout(() => loginForm.classList.remove('shake'), 500);
+                }
+            });
         });
     </script>
 </body>
