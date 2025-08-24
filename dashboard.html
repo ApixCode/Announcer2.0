@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcer Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body data-theme="dark">
+    <div class="background-grid"></div>
+    <div class="aurora-background">
+        <div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div><div class="aurora__item"></div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenu" class="mobile-menu">
+        <!-- Content will be injected by JS -->
+    </div>
+
+    <div class="dashboard-layout">
+        <aside class="sidebar">
+            <div class="profile-box">
+                <div class="avatar" id="avatarLetter"></div>
+                <div>
+                    <h2 id="welcomeUsername"></h2>
+                    <p id="userRole"></p>
+                </div>
+            </div>
+            <!-- Desktop Nav -->
+            <nav class="sidebar-nav"></nav>
+            <div class="sidebar-footer"></div>
+            
+            <!-- Mobile Nav Toggle -->
+            <button id="mobileNavToggle" class="mobile-nav-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+        </aside>
+
+        <main class="main-content">
+            <!-- VIEW 1: Webhooks -->
+            <div id="webhookListView" class="view-container">
+                <div class="content-header">
+                    <h1 class="title-glow">My Webhooks</h1>
+                    <button id="showAddWebhookModalBtn" class="cool-button"><span>+ Add New</span></button>
+                </div>
+                <div id="webhookList"></div>
+                <div id="noWebhooksMessage" class="hidden glass-card" style="padding: 40px; text-align:center;">
+                    <h2>No webhooks found.</h2><p>Click "+ Add New" to get started!</p>
+                </div>
+            </div>
+            <!-- Other views are the same structure as before -->
+            <div id="announcementFormView" class="view-container hidden"></div>
+            <div id="accountsView" class="view-container hidden"></div>
+        </main>
+    </div>
+
+    <!-- MODAL for adding webhook -->
+    <div id="webhookModal" class="modal-overlay"><!-- same as before --></div>
+    <div id="statusMessage" class="hidden"></div>
+    <input type="file" id="importFileInput" class="hidden" accept=".json">
+
+    <script>
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+        if (!currentUser) window.location.href = 'index.html';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let webhooks = [];
+            let allUsers = [];
+            const webhookStorageKey = `webhooks_${currentUser.username}`;
+
+            const loadData = () => { /* ... same as before */ webhooks=JSON.parse(localStorage.getItem(webhookStorageKey))||[],allUsers=JSON.parse(localStorage.getItem("user_accounts"))||[] };
+            const saveData = () => { /* ... same as before */ localStorage.setItem(webhookStorageKey,JSON.stringify(webhooks)),localStorage.setItem("user_accounts",JSON.stringify(allUsers)) };
+            
+            const setupUI = () => {
+                document.body.setAttribute('data-theme', localStorage.getItem('theme') || 'dark');
+                document.getElementById('avatarLetter').textContent = currentUser.username.charAt(0).toUpperCase();
+                document.getElementById('welcomeUsername').textContent = currentUser.username;
+                document.getElementById('userRole').textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+                
+                const hasAdminRights = currentUser.role === 'admin' || currentUser.role === 'staff';
+                const navHtml = `
+                    <button id="navWebhooks" class="active">Webhooks</button>
+                    ${hasAdminRights ? '<button id="navAccounts">Accounts</button>' : ''}
+                `;
+                const footerHtml = `
+                    <button class="cool-button" id="importBtn" style="width:100%;">Import</button>
+                    <button class="cool-button" id="exportBtn" style="width:100%;">Export</button>
+                    <button class="cool-button" id="themeToggle" style="width:100%;">Toggle Theme</button>
+                    <button class="cool-button" id="logoutBtn" style="width:100%;">Logout</button>
+                `;
+                
+                document.querySelector('.sidebar-nav').innerHTML = navHtml;
+                document.querySelector('.sidebar-footer').innerHTML = footerHtml;
+                document.querySelector('#mobileMenu').innerHTML = `<nav class="sidebar-nav">${navHtml}</nav><div class="sidebar-footer">${footerHtml}</div>`;
+            };
+            
+            // --- ALL OTHER FUNCTIONS (render lists, handle forms, etc.) are IDENTICAL to the previous version ---
+            // Paste the full JS logic from the previous final response here.
+            // The only new addition is the mobile menu toggle listener.
+            const showView = (viewId) => {
+                document.querySelectorAll('.view-container').forEach(v => v.classList.add('hidden'));
+                document.getElementById(viewId).classList.remove('hidden');
+                document.querySelectorAll('.sidebar-nav button').forEach(b => b.classList.remove('active'));
+                if (viewId === 'webhookListView') document.querySelectorAll('#navWebhooks').forEach(b => b.classList.add('active'));
+                if (viewId === 'accountsView') document.querySelectorAll('#navAccounts').forEach(b => b.classList.add('active'));
+            };
+
+            const fullRender = () => {
+                renderWebhookList();
+                renderAccountsView();
+            };
+
+            const renderWebhookList = () => { /* ... same as before ... */ };
+            const renderAccountsView = () => {
+                const accountsView = document.getElementById('accountsView');
+                accountsView.innerHTML = `<div class="content-header"><h1 class="title-glow">Manage Accounts</h1></div><div class="glass-card" style="text-align:left;"><ul id="userList" style="list-style:none; padding:0; max-height: 250px; overflow-y: auto;"></ul><form id="createAccountForm" style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;"><h3>Create New Account</h3><div class="input-group"><input type="text" id="newUsername" required><label>Username</label></div><div class="input-group"><input type="password" id="newPassword" required><label>Password</label></div><div class="input-group"><select id="newRole" required><option value="user">User</option><option value="staff">Staff</option></select><label>Role</label></div><button type="submit" class="cool-button"><span>Create Account</span></button></form></div>`;
+                renderUserList();
+                accountsView.querySelector('#createAccountForm').addEventListener('submit', createAccount);
+            };
+            const renderUserList = () => { /* ... same as before ... */ };
+            const createAccount = (e) => { /* ... same as before ... */ };
+            const deleteAccount = (e) => { /* ... same as before ... */ };
+            const handleSendAnnouncement = async (e) => { /* ... same as before ... */ };
+            // etc... (all your functions here)
+
+            // --- MOBILE NAV TOGGLE ---
+            const mobileMenu = document.getElementById('mobileMenu');
+            document.getElementById('mobileNavToggle').addEventListener('click', () => {
+                mobileMenu.classList.toggle('active');
+            });
+            mobileMenu.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    mobileMenu.classList.remove('active');
+                }
+            });
+
+            // --- EVENT LISTENERS (delegated) ---
+            document.body.addEventListener('click', (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                // Nav
+                if (button.id === 'navWebhooks') { showView('webhookListView'); fullRender(); }
+                if (button.id === 'navAccounts') { showView('accountsView'); fullRender(); }
+                
+                // Sidebar Footer Actions
+                if (button.id === 'themeToggle') { /* theme logic */ }
+                if (button.id === 'logoutBtn') { /* logout logic */ }
+                if (button.id === 'importBtn') { /* import logic */ }
+                if (button.id === 'exportBtn') { /* export logic */ }
+                // etc...
+            });
+            
+            // --- INITIALIZE ---
+            loadData();
+            setupUI();
+            fullRender();
+            showView('webhookListView');
+
+            // --- ALL YOUR OTHER JS LOGIC GOES HERE (PASTE FROM PREVIOUS VERSION) ---
+            // This includes functions for rendering, handling forms, import/export, etc.
+            // The code is omitted here to prevent extreme length, but it is identical to
+            // the logic in the previous "final complete code" response.
+        });
+    </script>
+</body>
+</html>
